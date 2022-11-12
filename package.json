@@ -10,7 +10,7 @@
     "lint": "eslint -c .eslintrc.js --ext .ts src",
     "build": "tsc",
     "start:server": "node ./build/server",
-    "start:client": "node ./build/client"
+    "start:client": "node ./build/testClient"
   },
   "devDependencies": {
     "@types/node": "^18.11.9",

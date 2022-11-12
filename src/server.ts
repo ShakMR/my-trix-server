@@ -1,6 +1,7 @@
 import net  from "net";
 import crypto from "crypto";
-import { Data, SocketWithId } from "./types";
+import { TextMessage, SocketWithId } from "./types";
+import JSONSocket from "./JSONSocket";
 
 //Configuration ===================================
 const port = 8888;
@@ -15,25 +16,24 @@ server.listen(port, function () {
 });
 
 
-let clients: Record<number, SocketWithId> = {}
+let clients: Record<number, JSONSocket> = {}
 //the client handling callback
 function onClientConnection(sock: SocketWithId) {
+  const jsonSocker = new JSONSocket(sock);
 
-  sock.id = crypto.randomInt(0, 1000000);
+  jsonSocker.id = crypto.randomInt(0, 1000000);
 
-  clients[sock.id] = sock;
+  clients[jsonSocker.id] = jsonSocker;
 
-  sock.setKeepAlive(true,60000);
 
-  sock.write(JSON.stringify({ type: "init", data: { id: sock.id }}));
-  sock.on("data", function (d: Data) {
-    const { data } = JSON.parse(d.toString());
+  jsonSocker.write({ type: "init", data: { id: jsonSocker.id }});
+  jsonSocker.on("data", function ({ type, data }: TextMessage) {
     const { to, message } = data;
 
     if (to in clients) {
-      clients[to].write(JSON.stringify({ type: "message", data: { from: sock.id, message } }));
+      clients[to].write({ type: "message", data: { from: jsonSocker.id, message } });
     } else {
-      sock.write(JSON.stringify({ type: "error", data: { message: "Message couldn't be delivered" }}));
+      jsonSocker.write({ type: "error", data: { message: "Message couldn't be delivered" }});
     }
   });
 
