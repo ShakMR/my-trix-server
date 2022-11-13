@@ -2,7 +2,14 @@ import net  from "net";
 import crypto from "crypto";
 import { TextMessage, SocketWithId } from "./types";
 import JSONSocket from "./JSONSocket";
+import * as dotenv from 'dotenv';
+import * as fs from "fs";
+import path from "path";
 
+dotenv.config()
+
+const privateKey = fs.readFileSync(path.join(".", "key", process.env.PRIVATE_KEY_FILE), {encoding: "utf-8" });
+const publicKey = fs.readFileSync(path.join(".", "key", process.env.PRIVATE_KEY_FILE), {encoding: "utf-8" });
 //Configuration ===================================
 const port = 8888;
 //=================================================
@@ -19,7 +26,10 @@ server.listen(port, function () {
 let clients: Record<number, JSONSocket> = {}
 //the client handling callback
 function onClientConnection(sock: SocketWithId) {
-  const jsonSocker = new JSONSocket(sock);
+  const jsonSocker = new JSONSocket(sock, {
+    privateKey: privateKey,
+    publicKey: publicKey,
+  });
 
   jsonSocker.id = crypto.randomInt(0, 1000000);
 

@@ -5,9 +5,17 @@ import {
   AuthResponseMessage,
   InitMessage,
   ResponseMessage,
-  TextMessage,
 } from "./types";
 import JSONSocket from "./JSONSocket";
+import * as dotenv from 'dotenv';
+import fs from "fs";
+import path from "path";
+
+dotenv.config()
+
+
+const privateKey = fs.readFileSync(path.join(".", "key", process.env.PRIVATE_KEY_FILE), {encoding: "utf-8" });
+const publicKey = fs.readFileSync(path.join(".", "key", process.env.PRIVATE_KEY_FILE), {encoding: "utf-8" });
 
 type ClientConfig = {
   host?: string;
@@ -29,7 +37,10 @@ class Client {
     this.host = host;
     this.port = port;
     this.auth = auth;
-    this.socket = new JSONSocket();
+    this.socket = new JSONSocket(undefined, {
+      privateKey: privateKey,
+      publicKey: publicKey,
+    });
     this.subscribers = [];
     this.queue = [];
   }

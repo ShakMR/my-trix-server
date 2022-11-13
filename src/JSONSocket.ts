@@ -1,13 +1,19 @@
+import crypto from "crypto";
 import { Socket, TcpSocketConnectOpts } from "net";
-import { AnyMessage, ID } from "./types";
+import { ID } from "./types";
 import { Duplex } from "stream";
+
+type SocketOptions = {
+  privateKey: string; // used for decrypting the received message
+  publicKey: string; // used for encrypting the message to be sent
+}
 
 class JSONSocket extends Duplex {
   private socketId: ID;
   private _readingPaused: boolean;
   private socket: Socket;
 
-  constructor(socket: Socket = new Socket()) {
+  constructor(socket: Socket = new Socket(), private options: SocketOptions) {
     super({objectMode: true});
     // used to control reading
     this._readingPaused = false;
@@ -52,7 +58,14 @@ class JSONSocket extends Duplex {
       // convert raw json to js object
       let json;
       try {
-        json = JSON.parse(body);
+        if (this.options.privateKey) {
+          const decryptedMessage = this.decrypt(body);
+          json = JSON.parse(decryptedMessage);
+        } else if (!this.options.publicKey) {
+          json = JSON.parse(body);
+        } else {
+          throw new Error("Cannot decrypt message because private key wasn't provided");
+        }
       } catch (ex) {
         this.socket.destroy(ex);
         return;
@@ -71,13 +84,39 @@ class JSONSocket extends Duplex {
     setImmediate(this.onReadable.bind(this));
   }
 
+  private decrypt(encryptedData: string) {
+    return crypto.privateDecrypt(
+        {
+          key: this.options.privateKey,
+          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: "sha256",
+        },
+        // @ts-ignore
+        Buffer.from(encryptedData.toString(), "base64")
+    ).toString();
+  }
+
+  private encrypt(json: string) {
+    return crypto.publicEncrypt(
+        {
+          key: this.options.publicKey,
+          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: "sha256",
+        },
+        Buffer.from(json)
+    ).toString("base64");
+  }
+
   _write(obj: any, encoding, cb: (error?: Error) => void) {
     let json = JSON.stringify(obj);
+    if (this.options.publicKey) {
+      json = this.encrypt(json);
+    }
     let jsonBytes = Buffer.byteLength(json);
     let buffer = Buffer.alloc(4 + jsonBytes);
     buffer.writeUInt32BE(jsonBytes);
     buffer.write(json, 4);
-    this.socket.write(buffer, encoding, cb);
+    this.socket.write(buffer, "base64", cb);
   }
 
   set id(id: ID) {
